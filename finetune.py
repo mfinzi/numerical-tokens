@@ -167,7 +167,6 @@ def setup_training_args(args):
         report_to="wandb",
         dataloader_num_workers=8,
         remove_unused_columns=False,
-        label_names=["crystal_ids"], #this is just to get trainer to behave how I want
     )
     return training_args
 
