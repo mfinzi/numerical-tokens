@@ -188,4 +188,5 @@ if __name__ == '__main__':
     }[args.dataset]
     dataset = ds(root=args.datadir) if args.datadir is not None else ds()
     #for ds in [MNISTSuperpixels(), QM9()]:
-    write_tokenized_dataset_to_file(dataset, settings, f'dataset_files/{dataset}.jsonl'.lower(), debug=args.debug)
+    output_file = f'dataset_files/{args.dataset}{"_debug" if args.debug else ""}.jsonl'.lower()
+    write_tokenized_dataset_to_file(dataset, settings, output_file, debug=args.debug)
