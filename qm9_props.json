@@ -1,0 +1,74 @@
+{
+    "mu": {
+        "index": 0,
+        "property": "μ",
+        "description": "Dipole moment",
+        "unit": "D"
+    },
+    "alpha": {
+        "index": 1,
+        "property": "α",
+        "description": "Isotropic polarizability",
+        "unit": "a0^3"
+    },
+    "homo": {
+        "index": 2,
+        "property": "ε_HOMO",
+        "description": "Highest occupied molecular orbital energy",
+        "unit": "eV"
+    },
+    "lumo": {
+        "index": 3,
+        "property": "ε_LUMO",
+        "description": "Lowest unoccupied molecular orbital energy",
+        "unit": "eV"
+    },
+    "gap": {
+        "index": 4,
+        "property": "Δε",
+        "description": "Gap between HOMO and LUMO",
+        "unit": "eV"
+    },
+    "r2": {
+        "index": 5,
+        "property": "⟨R^2⟩",
+        "description": "Electronic spatial extent",
+        "unit": "a0^2"
+    },
+    "zpve": {
+        "index": 6,
+        "property": "ZPVE",
+        "description": "Zero point vibrational energy",
+        "unit": "eV"
+    },
+    "u0": {
+        "index": 7,
+        "property": "U_0",
+        "description": "Internal energy at 0K",
+        "unit": "eV"
+    },
+    "u": {
+        "index": 8,
+        "property": "U",
+        "description": "Internal energy at 298.15K",
+        "unit": "eV"
+    },
+    "H": {
+        "index": 9,
+        "property": "H",
+        "description": "Enthalpy at 298.15K",
+        "unit": "eV"
+    },
+    "G": {
+        "index": 10,
+        "property": "G",
+        "description": "Free energy at 298.15K",
+        "unit": "eV"
+    },
+    "cv": {
+        "index": 11,
+        "property": "cv",
+        "description": "Heat capacity at 298.15K",
+        "unit": "eV"
+    }
+}
