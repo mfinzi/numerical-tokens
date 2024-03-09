@@ -7,6 +7,11 @@ import h5py
 from utils import fixed_seed
 import json
 from collections import namedtuple
+import fire
+import argparse
+from pathlib import Path
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from tokenizer import TokenizerSettings
 
 atomic_symbols = {
     1: 'H',   # Hydrogen
@@ -168,18 +173,7 @@ def write_tokenized_dataset_to_file(dataset, tokenizer_settings, output_file, de
             f.write(json_line + "\n")
             if i==500 and debug: break
 
-if __name__ == '__main__':
-    import argparse
-    from pathlib import Path
-    # write out tokenized training files
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--debug", action="store_true", default=False, help='whether to only write out a small number of examples')
-    parser.add_argument("--model_name", type=str, default="mistralai/Mistral-7B-v0.1")
-    parser.add_argument("--dataset", type=str, default="superpixelmnist", help='specified dataset')
-    parser.add_argument("--datadir", type=Path, default=None, help="root directory for dataset")
-    args = parser.parse_args()
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-    from tokenizer import TokenizerSettings
+def write_dataset(model_name="meta-llama/Llama-2-7b-hf", dataset='qm9',datadir=None,debug=False):
     base_tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_auth_token=True)
     settings = TokenizerSettings(base_tokenizer)
     ds = {
@@ -190,3 +184,8 @@ if __name__ == '__main__':
     #for ds in [MNISTSuperpixels(), QM9()]:
     output_file = f'dataset_files/{args.dataset}{"_debug" if args.debug else ""}.jsonl'.lower()
     write_tokenized_dataset_to_file(dataset, settings, output_file, debug=args.debug)
+
+if __name__ == '__main__':
+    fire.Fire(write_dataset)
+    
+    
