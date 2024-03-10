@@ -6,13 +6,12 @@ from torch_geometric.datasets import QM9 as tgQM9
 import h5py
 from utils import fixed_seed
 import json
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 import fire
 import argparse
 from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from tokenizer import TokenizerSettings
-
 atomic_symbols = {
     1: 'H',   # Hydrogen
     2: 'He',  # Helium
@@ -54,7 +53,7 @@ class QM9(Dataset):
         targets = {vals['property']: Unitful(row.y[0,vals['index']].item(),vals['unit']) for k,vals in self.propdict.items()}
         #target = row.y[0,2]
         #prompt = "\n\n HOMO: "
-        return {'molecule': inp, 'targets':targets}
+        return OrderedDict({'molecule': inp, 'targets':targets})
 
 Superpixel = namedtuple('Superpixel', ['x', 'y', 'c'])
 
@@ -166,24 +165,27 @@ def write_tokenized_dataset_to_file(dataset, tokenizer_settings, output_file, de
         for together finetuning
         """
     with open(output_file, "w") as f:
-        for i in tqdm(range(len(dataset))):
-            tokenized = tokenize(dataset[i], tokenizer_settings)
-            text = tokenizer_settings.base_tokenizer.decode(tokenized)
-            json_line = json.dumps({"text": text})
-            f.write(json_line + "\n")
-            if i==500 and debug: break
+        for _ in range(4):
+            for i in tqdm(range(len(dataset))):
+                tokenized = tokenize(dataset[i], tokenizer_settings)
+                text = tokenizer_settings.base_tokenizer.decode(tokenized)
+                json_line = json.dumps({"text": text})
+                f.write(json_line + "\n")
+                if i==500 and debug: break
 
-def write_dataset(model_name="meta-llama/Llama-2-7b-hf", dataset='qm9',datadir=None,debug=False):
-    base_tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_auth_token=True)
-    settings = TokenizerSettings(base_tokenizer)
+def write_dataset(model_name="meta-llama/Llama-2-7b-hf", dataset='qm9',datadir=None,debug=False, aug=True, overwrite=False):
+    output_file = f'dataset_files/{dataset}{"_debug" if debug else ""}{"_aug" if aug else ""}.jsonl'.lower()
+    if os.path.exists(output_file) and not overwrite:
+        return output_file
+    base_tokenizer = AutoTokenizer.from_pretrained(model_name, use_auth_token=True)
+    settings = TokenizerSettings(base_tokenizer, random_transform=aug)
     ds = {
         'superpixelmnist': MNISTSuperpixels,
         'qm9': QM9
-    }[args.dataset]
-    dataset = ds(root=args.datadir) if args.datadir is not None else ds()
-    #for ds in [MNISTSuperpixels(), QM9()]:
-    output_file = f'dataset_files/{args.dataset}{"_debug" if args.debug else ""}.jsonl'.lower()
-    write_tokenized_dataset_to_file(dataset, settings, output_file, debug=args.debug)
+    }[dataset]
+    dataset = ds(root=datadir) if datadir is not None else ds()
+    write_tokenized_dataset_to_file(dataset, settings, output_file, debug=debug)
+    return output_file
 
 if __name__ == '__main__':
     fire.Fire(write_dataset)

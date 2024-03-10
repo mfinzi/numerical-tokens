@@ -2,9 +2,9 @@ from plum import dispatch
 import numpy as np
 import torch
 
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from dataclasses import dataclass
-
+import random
 #assumes using transformers tokenizers
 
 @dataclass
@@ -14,6 +14,7 @@ class TokenizerSettings:
     scaler: float = 1. # scaling for floating point numbers
     decimal_half_bin_correction: bool = False
     separator: str = ','
+    random_transform: bool = False
     #dequantization_noise: bool = False
 
 # default_settings = TokenizerSettings()
@@ -45,7 +46,10 @@ def tokenize(obj: int, settings):
 @dispatch
 def tokenize(obj: dict, settings):
     out = []
-    for k, v in obj.items():
+    items = list(obj.items())
+    if settings.random_transform and not isinstance(obj, OrderedDict):
+        random.shuffle(items)  # apply a random permutation
+    for k, v in items:
         if len(out) > 0:
             out.append(settings.base_tokenizer.convert_tokens_to_ids(settings.separator))
         out.extend(tokenize(k, settings))
