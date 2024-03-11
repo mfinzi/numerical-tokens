@@ -49,10 +49,8 @@ class QM9(Dataset):
         elem_symbols = [atomic_symbols[z.item()] for z in row.z]
         elem_pos = [(elem, pos) for elem, pos in zip(elem_symbols, row.pos)]
         x1 = elem_pos if self.pos else elem_symbols
-        inp = (x1, row.edge_index.T) if self.edges else x1
+        inp = (set(x1), row.edge_index.T) if self.edges else set(x1)
         targets = {vals['property']: Unitful(row.y[0,vals['index']].item(),vals['unit']) for k,vals in self.propdict.items()}
-        #target = row.y[0,2]
-        #prompt = "\n\n HOMO: "
         return OrderedDict({'molecule': inp, 'targets':targets})
 
 Superpixel = namedtuple('Superpixel', ['x', 'y', 'c'])
@@ -76,88 +74,94 @@ class MNISTSuperpixels(torch_geometric.datasets.MNISTSuperpixels):
         coords = (datapoint.pos-13.5)/5 # 2 x M array of coordinates
         bchannel = datapoint.x.T[0]#(datapoint.x.T-.1307)/0.3081 # 1 x M array of blackwhite info
         label = int(datapoint.y.item())
-        img = [Superpixel(*coords[i], bchannel[i]) for i in range(len(bchannel))]
-        return {'image': img, 'label': label}
+        img = [Superpixel(*coords[i], bchannel[i]) for i in range(len(bchannel)) if bchannel[i]>0.]
+        return OrderedDict({'image': img, 'label': label})
         #return ((coords,bchannel),label)
 
 
-# class ModelNet40(Dataset):
-#     ignored_index = -100
-#     class_weights = None
-#     stratify=True
-#     num_targets=40
-#     classes=['airplane', 'bathtub', 'bed', 'bench', 'bookshelf', 'bottle', 'bowl', 'car',
-#         'chair', 'cone', 'cup', 'curtain', 'desk', 'door', 'dresser', 'flower_pot',
-#         'glass_box', 'guitar', 'keyboard', 'lamp', 'laptop', 'mantel', 'monitor',
-#         'night_stand', 'person', 'piano', 'plant', 'radio', 'range_hood', 'sink',
-#         'sofa', 'stairs', 'stool', 'table', 'tent', 'toilet', 'tv_stand', 'vase',
-#         'wardrobe', 'xbox']
-#     default_root_dir = '~/datasets/ModelNet40/'
-#     def __init__(self,root_dir=default_root_dir,train=True,transform=None,size=1024):
-#         super().__init__()
-#         #self.transform = torchvision.transforms.ToTensor() if transform is None else transform
-#         train_x,train_y,test_x,test_y = load_data(os.path.expanduser(root_dir),classification=True)
-#         self.coords = train_x if train else test_x
-#         # SWAP y and z so that z (gravity direction) is in component 3
-#         self.coords[...,2] += self.coords[...,1]
-#         self.coords[...,1] = self.coords[...,2]-self.coords[...,1]
-#         self.coords[...,2] -= self.coords[...,1]
-#         # N x m x 3
-#         self.labels = train_y if train else test_y
-#         self.coords_std = np.std(train_x,axis=(0,1))
-#         self.coords /= self.coords_std
-#         self.coords = self.coords.transpose((0,2,1)) # B x n x c -> B x c x n
-#         self.size=size
-#         #pt_coords = torch.from_numpy(self.coords)
-#         #self.coords = FarthestSubsample(ds_frac=size/2048)((pt_coords,pt_coords))[0].numpy()
+import os
+import requests
+import zipfile
+from typing import Dict, Tuple
+import torch
+from torch.utils.data import Dataset
+from torch_geometric.data import Data
+from torch_geometric.io import read_off
 
-#     def __getitem__(self,index):
-#         return torch.from_numpy(self.coords[index]).float(), int(self.labels[index])
-#     def __len__(self):
-#         return len(self.labels)
-
-
-
-
-
-# def load_h5(h5_filename):
-#     f = h5py.File(h5_filename)
-#     data = f['data'][:]
-#     label = f['label'][:]
-#     seg = []
-#     return (data, label, seg)
-
-# def _load_data_file(name):
-#     f = h5py.File(name)
-#     data = f["data"][:]
-#     label = f["label"][:]
-#     return data, label
-
-# def load_data(dir,classification = False):
-#     data_train0, label_train0,Seglabel_train0  = load_h5(dir + 'ply_data_train0.h5')
-#     data_train1, label_train1,Seglabel_train1 = load_h5(dir + 'ply_data_train1.h5')
-#     data_train2, label_train2,Seglabel_train2 = load_h5(dir + 'ply_data_train2.h5')
-#     data_train3, label_train3,Seglabel_train3 = load_h5(dir + 'ply_data_train3.h5')
-#     data_train4, label_train4,Seglabel_train4 = load_h5(dir + 'ply_data_train4.h5')
-#     data_test0, label_test0,Seglabel_test0 = load_h5(dir + 'ply_data_test0.h5')
-#     data_test1, label_test1,Seglabel_test1 = load_h5(dir + 'ply_data_test1.h5')
-#     train_data = np.concatenate([data_train0,data_train1,data_train2,data_train3,data_train4])
-#     train_label = np.concatenate([label_train0,label_train1,label_train2,label_train3,label_train4])
-#     train_Seglabel = np.concatenate([Seglabel_train0,Seglabel_train1,Seglabel_train2,Seglabel_train3,Seglabel_train4])
-#     test_data = np.concatenate([data_test0,data_test1])
-#     test_label = np.concatenate([label_test0,label_test1])
-#     test_Seglabel = np.concatenate([Seglabel_test0,Seglabel_test1])
-
-#     if classification:
-#         return train_data, train_label, test_data, test_label
-#     else:
-#         return train_data, train_Seglabel, test_data, test_Seglabel
+class ModelNet10(Dataset):
+    def __init__(self, root="ModelNet", categories=None, split='train', transform=None):
+        super().__init__()
+        self.root = os.path.expanduser(root)
+        self.split = split
+        self.transform = transform
+        
+        # Define the categories
+        if categories is None:
+            categories = ['bathtub', 'bed', 'chair', 'desk', 'dresser', 'monitor', 'night_stand', 'sofa', 'table', 'toilet']
+        self.categories = categories
+        
+        # Check if the data file exists
+        data_file = os.path.join(self.root, f"modelnet10_{split}.pt")
+        if os.path.exists(data_file):
+            # Load the data from the file
+            self.data = torch.load(data_file)
+        else:
+            # Download the dataset if not already downloaded
+            if not os.path.exists(self.root):
+                self.download()
+            
+            # Load the data
+            self.data = []
+            for category in self.categories:
+                folder = os.path.join(self.root, "ModelNet10", category, split)
+                files = [f for f in os.listdir(folder) if f.endswith('.off')]
+                print(files)
+                for file in files:
+                    data = read_off(os.path.join(folder, file))
+                    print(data)
+                    data.y = torch.tensor([self.categories.index(category)], dtype=torch.long)
+                    self.data.append(data)
+            
+            # Save the data to a file
+            torch.save(self.data, data_file)
+    
+    def __len__(self):
+        return len(self.data)
+    
+    def __getitem__(self, index) -> OrderedDict:
+        data = self.data[index]
+        if self.transform is not None:
+            data = self.transform(data)
+        
+        # Convert point cloud to a set of tuples
+        point_cloud = set(tuple(point.tolist()) for point in data.pos)
+        
+        # Get the class name
+        class_name = self.categories[data.y.item()]
+        
+        return OrderedDict({'point_cloud': point_cloud, 'class': class_name})
+    
+    def download(self):
+        url = "http://vision.princeton.edu/projects/2014/3DShapeNets/ModelNet10.zip"
+        filename = "ModelNet10.zip"
+        
+        print(f"Downloading {url}...")
+        response = requests.get(url)
+        
+        with open(filename, 'wb') as f:
+            f.write(response.content)
+        
+        print(f"Extracting {filename}...")
+        with zipfile.ZipFile(filename, 'r') as zip_ref:
+            zip_ref.extractall(self.root)
 
 
 
 import json
 from tqdm.auto import tqdm
-def write_tokenized_dataset_to_file(dataset, tokenizer_settings, output_file, debug=False):
+import math
+import numpy as np
+def write_tokenized_dataset_to_file(dataset, tokenizer_settings, output_file, debug=False, epochs=1):
     """ write out dataset to a json that looks like
         {"text": "..."}
         {"text": "..."}
@@ -165,26 +169,33 @@ def write_tokenized_dataset_to_file(dataset, tokenizer_settings, output_file, de
         for together finetuning
         """
     with open(output_file, "w") as f:
-        for _ in range(4):
-            for i in tqdm(range(len(dataset))):
-                tokenized = tokenize(dataset[i], tokenizer_settings)
+        n = math.ceil(epochs)
+        for e in range(n):
+            # iterate through the dataset 
+            perm = np.random.permutation(len(dataset))
+            outlen = len(dataset) if e!=n-1 else int(len(dataset)*(epochs-e))
+            for i in tqdm(range(outlen)):
+                tokenized = tokenize(dataset[perm[i]], tokenizer_settings)
                 text = tokenizer_settings.base_tokenizer.decode(tokenized)
                 json_line = json.dumps({"text": text})
                 f.write(json_line + "\n")
                 if i==500 and debug: break
 
-def write_dataset(model_name="meta-llama/Llama-2-7b-hf", dataset='qm9',datadir=None,debug=False, aug=True, overwrite=False):
-    output_file = f'dataset_files/{dataset}{"_debug" if debug else ""}{"_aug" if aug else ""}.jsonl'.lower()
+def write_dataset(model_name="meta-llama/Llama-2-7b-hf", dataset='qm9',datadir=None,
+                    debug=False, aug=True, overwrite=False, epochs=1, suffix=""):
+    output_file = f'dataset_files/{dataset}{"_debug" if debug else ""}{"_aug" if aug else ""}_{epochs:.1f}_{suffix}.jsonl'.lower()
     if os.path.exists(output_file) and not overwrite:
         return output_file
-    base_tokenizer = AutoTokenizer.from_pretrained(model_name, use_auth_token=True)
+    
+    tokenizer_model_name = "meta-llama/Llama-2-7b-hf" #TODO: fix this up? how do we get the tokenizer for the together models
+    base_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model_name, use_auth_token=True)
     settings = TokenizerSettings(base_tokenizer, random_transform=aug)
     ds = {
         'superpixelmnist': MNISTSuperpixels,
         'qm9': QM9
     }[dataset]
     dataset = ds(root=datadir) if datadir is not None else ds()
-    write_tokenized_dataset_to_file(dataset, settings, output_file, debug=debug)
+    write_tokenized_dataset_to_file(dataset, settings, output_file, debug=debug, epochs=epochs)
     return output_file
 
 if __name__ == '__main__':

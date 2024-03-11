@@ -44,17 +44,33 @@ def tokenize(obj: int, settings):
     return settings.base_tokenizer.convert_tokens_to_ids(list(str(obj)))
 
 @dispatch
+def tokenize(obj: set, settings):
+    out = []
+    items = list(obj)
+    if settings.random_transform:
+        random.shuffle(items)  # apply a random permutation
+    out.append(settings.base_tokenizer.convert_tokens_to_ids('{'))
+    for v in items:
+        if len(out) > 0:
+            out.append(settings.base_tokenizer.convert_tokens_to_ids(settings.separator))
+        out.extend(tokenize(v, settings))
+    out.append(settings.base_tokenizer.convert_tokens_to_ids('}'))
+    return out
+
+@dispatch
 def tokenize(obj: dict, settings):
     out = []
     items = list(obj.items())
     if settings.random_transform and not isinstance(obj, OrderedDict):
         random.shuffle(items)  # apply a random permutation
+    out.append(settings.base_tokenizer.convert_tokens_to_ids('{'))
     for k, v in items:
         if len(out) > 0:
             out.append(settings.base_tokenizer.convert_tokens_to_ids(settings.separator))
-        out.extend(tokenize(k, settings))
+        out.extend(tokenize(k, settings))+tokenize(obj.x,s)+tokenize(',',s)
         out.append(settings.base_tokenizer.convert_tokens_to_ids(':'))
         out.extend(tokenize(v, settings))
+    out.append(settings.base_tokenizer.convert_tokens_to_ids('}'))
     return out
 
 
