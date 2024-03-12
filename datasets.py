@@ -87,9 +87,10 @@ import torch
 from torch.utils.data import Dataset
 from torch_geometric.data import Data
 from torch_geometric.io import read_off
+from torch_geometric.transforms import FarthestPointSampling
 
 class ModelNet10(Dataset):
-    def __init__(self, root="~/datasets/ModelNet", categories=None, split='train', transform=None):
+    def __init__(self, root="~/datasets/ModelNet", categories=None, split='train', transform=None, num_points=100):
         super().__init__()
         self.root = os.path.expanduser(root)
         self.split = split
@@ -120,6 +121,7 @@ class ModelNet10(Dataset):
                     data.y = torch.tensor([self.categories.index(category)], dtype=torch.long)
                     self.data.append(data)
             
+            self.data = FarthestPointSampling(num_points)(self.data)
             # Save the data to a file
             torch.save(self.data, data_file)
     
