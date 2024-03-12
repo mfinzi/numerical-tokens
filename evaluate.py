@@ -10,14 +10,18 @@ from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from tokenizer import TokenizerSettings
 import fire
+import requests
 
-
-def sample_completions(model_name, prefix):
-    output = together.Complete.create(
-            prompt = prefix, 
-            model = model_name, max_tokens=300, temperature=1.0)
-    text_out = output['output']['choices'][0]['text']
-    return text_out
+def sample_completions(model_name, prefix, patience=5):
+    try:
+        output = together.Complete.create(
+                prompt = prefix, 
+                model = model_name, max_tokens=300, temperature=1.0)
+        text_out = output['output']['choices'][0]['text']
+        return text_out
+    except requests.exceptions.HTTPError as e:
+        print("Request failed, retrying...")
+        return sample_completions(model_name, prefix, patience-1) if patience > 0 else f"Request failed too many times with {e}"
 
 def eval_qm9(model_name,tokenizer_model="meta-llama/Llama-2-7b-hf", datadir=None, samples=3, debug=False):
     base_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model, token=True)
@@ -32,7 +36,6 @@ def eval_qm9(model_name,tokenizer_model="meta-llama/Llama-2-7b-hf", datadir=None
         prefix += 'targets:'
         matches = []
         for i in range(samples):
-            
             text_out = sample_completions(model_name, prefix)
             matches_dict = {match[0]: float(match[1]) for match in re.findall(pattern_dict,text_out)}
             matches_dict['sample'] = i
@@ -47,7 +50,7 @@ def eval_qm9(model_name,tokenizer_model="meta-llama/Llama-2-7b-hf", datadir=None
     final_df = pd.concat(all_preds)
     final_df = final_df.set_index(['n', final_df.index])
     final_df.reset_index(inplace=True)
-    final_df.to_csv(f'dataset_files/evalqm9{"_debug" if debug else ""}.csv'.lower())
+    final_df.to_csv(f'dataset_files/{model_name}{"_debug" if debug else ""}.csv'.lower())
     preds = final_df[final_df['sample'] != -1]
     targets = final_df[final_df['sample'] == -1]
 

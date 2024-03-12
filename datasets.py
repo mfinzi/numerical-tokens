@@ -50,7 +50,7 @@ class QM9(Dataset):
         elem_pos = [(elem, pos) for elem, pos in zip(elem_symbols, row.pos)]
         x1 = elem_pos if self.pos else elem_symbols
         inp = (set(x1), row.edge_index.T) if self.edges else set(x1)
-        targets = {vals['property']: Unitful(row.y[0,vals['index']].item(),vals['unit']) for k,vals in self.propdict.items()}
+        targets = OrderedDict({vals['property']: Unitful(row.y[0,vals['index']].item(),vals['unit']) for k,vals in self.propdict.items()})
         return OrderedDict({'molecule': inp, 'targets':targets})
 
 Superpixel = namedtuple('Superpixel', ['x', 'y', 'c'])
@@ -75,7 +75,7 @@ class MNISTSuperpixels(torch_geometric.datasets.MNISTSuperpixels):
         bchannel = datapoint.x.T[0]#(datapoint.x.T-.1307)/0.3081 # 1 x M array of blackwhite info
         label = int(datapoint.y.item())
         img = [Superpixel(*coords[i], bchannel[i]) for i in range(len(bchannel)) if bchannel[i]>0.]
-        return OrderedDict({'image': img, 'label': label})
+        return OrderedDict({'image': img, 'class': label})
         #return ((coords,bchannel),label)
 
 
@@ -89,7 +89,7 @@ from torch_geometric.data import Data
 from torch_geometric.io import read_off
 
 class ModelNet10(Dataset):
-    def __init__(self, root="ModelNet", categories=None, split='train', transform=None):
+    def __init__(self, root="~/datasets/ModelNet", categories=None, split='train', transform=None):
         super().__init__()
         self.root = os.path.expanduser(root)
         self.split = split
@@ -115,10 +115,8 @@ class ModelNet10(Dataset):
             for category in self.categories:
                 folder = os.path.join(self.root, "ModelNet10", category, split)
                 files = [f for f in os.listdir(folder) if f.endswith('.off')]
-                print(files)
                 for file in files:
                     data = read_off(os.path.join(folder, file))
-                    print(data)
                     data.y = torch.tensor([self.categories.index(category)], dtype=torch.long)
                     self.data.append(data)
             
@@ -192,7 +190,8 @@ def write_dataset(model_name="meta-llama/Llama-2-7b-hf", dataset='qm9',datadir=N
     settings = TokenizerSettings(base_tokenizer, random_transform=aug)
     ds = {
         'superpixelmnist': MNISTSuperpixels,
-        'qm9': QM9
+        'qm9': QM9,
+        'modelnet10': ModelNet10,
     }[dataset]
     dataset = ds(root=datadir) if datadir is not None else ds()
     write_tokenized_dataset_to_file(dataset, settings, output_file, debug=debug, epochs=epochs)
